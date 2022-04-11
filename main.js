@@ -5,7 +5,7 @@ let remoteStream;
 let servers = {
   iceServers: [
     {
-      urls: ["stun:stun1.1.google.com:19302", "stun:stun2.2.google.com:19302"],
+      urls: ["stun:stun1.1.google.com:19302", "stun:stun2.1.google.com:19302"],
     },
   ],
 };
@@ -19,7 +19,7 @@ let init = async () => {
   document.getElementById("user-1").srcObject = localStream;
 };
 
-let createOffer = async () => {
+let createPeerConnection = async (sdpType) => {
   peerConnection = new RTCPeerConnection(servers);
 
   remoteStream = new MediaStream();
@@ -29,7 +29,7 @@ let createOffer = async () => {
     peerConnection.addTrack(track, localStream);
   });
 
-  peerConnection.onicecandidate = async (event) => {
+  peerConnection.ontrack = async (event) => {
     event.streams[0].getTracks().forEach((track) => {
       remoteStream.addTrack(track);
     });
@@ -37,16 +37,45 @@ let createOffer = async () => {
 
   peerConnection.onicecandidate = async (event) => {
     if (event.candidate) {
-      document.getElementById("offer-sdp").value = JSON.stringify(
+      document.getElementById(sdpType).value = JSON.stringify(
         peerConnection.localDescription
       );
     }
   };
+};
 
+let createOffer = async () => {
+  createPeerConnection("offer-sdp");
   let offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
   document.getElementById("offer-sdp").value = JSON.stringify(offer);
+};
+
+let createAnswer = async () => {
+  createPeerConnection("answer-sdp");
+
+  let offer = document.getElementById("offer-sdp").value;
+  if (!offer) return alert("Retrieve offer from peer first...");
+
+  offer = JSON.parse(offer);
+  await peerConnection.setRemoteDescription(offer);
+
+  let answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+
+  document.getElementById("answer-sdp").value = JSON.stringify(answer);
+};
+
+let addAnswer = async () => {
+  let answer = document.getElementById("answer-sdp").value;
+  if (!answer) return alert("Retrieve answer from peer first...");
+
+  answer = JSON.parse(answer);
+
+  if (!peerConnection.currentRemoteDescription) {
+    peerConnection.setRemoteDescription(answer);
+  }
 };
 
 init();
@@ -55,3 +84,4 @@ document.getElementById("create-offer").addEventListener("click", createOffer);
 document
   .getElementById("create-answer")
   .addEventListener("click", createAnswer);
+document.getElementById("add-answer").addEventListener("click", addAnswer);
